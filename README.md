@@ -77,7 +77,6 @@ Reverse Shell Diagram\
 
 
 
-
 ### Clients
 Display previously connected clients and clients with an active connection to the server\
 ![Picture5](https://github.com/8itwise/Caesar-Reverse-Shell/assets/18365258/78420df0-11b1-4671-8dcb-87f66ae29ed4)
@@ -108,7 +107,7 @@ Get a summary of the target's browsing History
 
 
 ### Browsing Active Times 
-Rank target's most active browsing hour. 
+Rank target's most active browsing hour
 
 ![Picture3](https://github.com/8itwise/Caesar-Reverse-Shell/assets/18365258/93ba9d95-0fb8-4d72-8033-adf595a42a5d)
 
@@ -123,7 +122,7 @@ Display the web domains the target has visited and contents on the domain the ta
 ![Picture7](https://github.com/8itwise/Caesar-Reverse-Shell/assets/18365258/6c4d0f54-265f-44b8-961f-ecf2ca8706dd)
 
 
-### Examine Target's Youtube Data \
+### Examine Target's Youtube Data 
 Display the youtube channels the target has watched and the videos on the channel the target has viewed
 ![Screenshot 2023-06-18 172115](https://github.com/8itwise/Caesar-Reverse-Shell/assets/18365258/afee1ef1-5a18-456f-a479-8e6643751461)
 ![Screenshot 2023-06-18 172438](https://github.com/8itwise/Caesar-Reverse-Shell/assets/18365258/7fc35cef-358a-4d4c-a088-340171860511)
@@ -136,7 +135,6 @@ Caesar Reverse Shell requires Python 3 and certain dependencies. Use pip to inst
 
 ```
 pip install -r requirements.txt
-
 ```
 
 ## Usage 
