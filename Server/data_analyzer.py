@@ -30,7 +30,7 @@ class Analyzer:
 
 
 
-    #retrieves the specified feilds in a document
+    # retrieves the specified feilds in a document
     def get_field(self, client_id, feild_parameter):
         try:
             resp = self.es.get(index=self.db_name, id=client_id)
@@ -110,7 +110,7 @@ class Analyzer:
 
 
 
-    #return a summary of targets browsing activity
+    # return a summary of targets browsing activity
     def browser_history_summary(self, client_id):
 
         browsing_history = self.get_field(client_id, "browser-history")
@@ -118,7 +118,7 @@ class Analyzer:
 
         try:
 
-            #convert visit count to int
+            # convert visit count to int
             for record in browsing_history:
                     record["Visit Count"] = int(record["Visit Count"])
 
@@ -159,9 +159,9 @@ class Analyzer:
 
 
 
-    #ranks targets most watched youtube channel in descending order
+    # ranks targets most watched youtube channel in descending order
     def rank_youtube_channels(self, client_id, count):
-
+        
             try:
 
                 if self.get_field(client_id, "modified-browser-history") != "null":

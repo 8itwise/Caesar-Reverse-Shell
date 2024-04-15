@@ -139,16 +139,16 @@ pip install -r requirements.txt
 
 ## Usage 
 
-After installing the dependencies, you can run the server by navigating to the Server folder executing the following command:
-
-```
- python3 main.py
-```
-
-Running the client with administrator privileges is necessary to capture network packets. To run the Client, navigate to the client folder and execute the following command on the target machine:
+The server was designed to run on a Linux machine and requires administrative privileges. You can run the server by navigating to the Server folder executing the following command:
 
 ```
  sudo python3 main.py
+```
+
+The Client was designed to run on a Windows machine. To run the Client, navigate to the Client folder and execute the following command on the target machine:
+
+```
+python3 main.py
  ```
 
 

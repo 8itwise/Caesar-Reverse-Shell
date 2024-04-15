@@ -94,7 +94,7 @@ class ClientHandler:
                 path = os.path.join(client_folder, client_id, image_name + ".jpg")
 
                 with open(path, 'wb') as file:
-                    fileSize = int(client_sock_object.recv(1024).decode())# accept and decode image file size
+                    fileSize = int(client_sock_object.recv(1024).decode()) # accept and decode image file size
                     time.sleep(1)
                     data = client_sock_object.recv(1024) # accept and decode length of data received
                     totalFileRecv = len(data)
