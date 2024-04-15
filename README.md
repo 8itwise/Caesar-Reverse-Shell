@@ -19,7 +19,7 @@ Caesar serves as a prototype and is strictly intended for educational purposes o
 
 * Verify Elasticsearch Setup: Confirm that Elasticsearch is running and accessible by visiting http://localhost:9200 in your web browser. You should see a JSON response indicating the Elasticsearch cluster status.
 
-* Create Elasticsearch Index: Create an index in Elasticsearch to store the target's. You can use the Elasticsearch API or tools like Kibana to create the index with the desired settings and mappings.
+* Create Elasticsearch Index: Create an index in Elasticsearch to store the target's data. You can use the Elasticsearch API or tools like Kibana to create the index with the desired settings and mappings.
 
 
 
