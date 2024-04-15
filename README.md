@@ -137,19 +137,25 @@ Caesar Reverse Shell requires Python 3 and certain dependencies. Use pip to inst
 pip install -r requirements.txt
 ```
 
-## Usage 
 
-The server was designed to run on a Linux machine and requires administrative privileges. You can run the server by navigating to the Server folder executing the following command:
+## Usage
+
+### Server Component
+* Install and configure Elasticsearch on a Linux system.
+* Create an index in Elasticsearch specifically for the server program to store target information.
+```
+curl -X PUT "http://localhost:9200/your_index_name"
+```
+* Run the Caesar's server script on the Linux system with admin priviledges.
 
 ```
- sudo python3 main.py
+    sudo python3 main.py
 ```
 
-The Client was designed to run on a Windows machine. To run the Client, navigate to the Client folder and execute the following command on the target machine:
+### Client Component
 
-```
-python3 main.py
- ```
+* Run the Caesar's client script on Windows systems.
+* Connect to the Caesar-Light server to initiate a reverse shell connection and provide remote access to the target system.
 
 
 ## Disclaimer
