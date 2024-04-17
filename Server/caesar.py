@@ -56,8 +56,8 @@ class Caesar:
                 try:
                     conn, addr = self.sock.accept()
                     conn.setblocking(True)
-                    client_info = conn.recv(1024).decode()# recieves client system information
-                    ip = re.findall("'(.*?)'", str(addr))# extract ip from addr
+                    client_info = conn.recv(1024).decode() # recieves client system information
+                    ip = re.findall("'(.*?)'", str(addr)) # extract ip from addr
                     ip = "".join(ip)
 
                     # check if connected client already exists in ES index
@@ -393,14 +393,15 @@ class Caesar:
                 elif cmd.strip() == 'guide':
                     self.show_commands()
 
-                elif 'get' in cmd:
+                elif cmd.startswith('get '):
                     client_id = cmd[4:]
                     self.esHandler.retrieve_client_document(client_id)
 
                 
-                elif cmd.startswith('delete all '):
+                elif cmd == 'delete all':
                     self.esHandler.delete_all_docs()
                     self.socket_object_dict.clear()
+
 
                 elif cmd.startswith('delete '):
                     client_id = cmd[7:]
@@ -409,7 +410,7 @@ class Caesar:
                         self.socket_object_dict.pop(client_id)
 
 
-                elif 'field' in cmd:
+                elif cmd.startswith('field '):
                     cmd = cmd.split()
                     if len(cmd) == 3:          
                         client_id = cmd[1]
@@ -428,7 +429,7 @@ class Caesar:
                     client_sock_object = self.get_socket_obj(client_id)
 
                     # check if connection is still active
-                    if(self.socket_object_dict):
+                    if self.socket_object_dict:
                         try:
                             client_sock_object.send("conn check".encode())
                             self.handle_client_session(client_id, client_sock_object)
